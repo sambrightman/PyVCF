@@ -45,6 +45,23 @@ RESERVED_INFO = {
     'CICN': 'Integer', 'CICNADJ': 'Integer'
 }
 
+INTEGER = 0
+STRING = 1
+FLOAT = 2
+FLAG = 3
+
+def _encode_type(field_type):
+    return {
+        'Integer': INTEGER,
+        'String': STRING,
+        'Character': STRING,
+        'Float': FLOAT,
+        'Numeric': FLOAT,
+        'Flag': FLAG,
+    }[field_type]
+
+RESERVED_INFO_CODES = { k: _encode_type(v) for k, v in RESERVED_INFO.items() }
+
 RESERVED_FORMAT = {
     'GT': 'String', 'DP': 'Integer', 'FT': 'String', 'GL': 'Float',
     'GLE': 'String', 'PL': 'Integer', 'GP': 'Float', 'GQ': 'Integer',
@@ -69,7 +86,7 @@ field_counts = {
 }
 
 
-_Info = collections.namedtuple('Info', ['id', 'num', 'type', 'desc', 'source', 'version'])
+_Info = collections.namedtuple('Info', ['id', 'num', 'type', 'desc', 'source', 'version', 'type_code'])
 _Filter = collections.namedtuple('Filter', ['id', 'desc'])
 _Alt = collections.namedtuple('Alt', ['id', 'desc'])
 _Format = collections.namedtuple('Format', ['id', 'num', 'type', 'desc'])
@@ -131,7 +148,8 @@ class _vcf_metadata_parser(object):
 
         info = _Info(match.group('id'), num,
                      match.group('type'), match.group('desc'),
-                     match.group('source'), match.group('version'))
+                     match.group('source'), match.group('version'),
+                     _encode_type(match.group('type')))
 
         return (match.group('id'), info)
 
@@ -387,17 +405,17 @@ class Reader(object):
             entry = entry.split('=', 1)
             ID = entry[0]
             try:
-                entry_type = self.infos[ID].type
+                entry_type = self.infos[ID].type_code
             except KeyError:
                 try:
-                    entry_type = RESERVED_INFO[ID]
+                    entry_type = RESERVED_INFO_CODES[ID]
                 except KeyError:
                     if entry[1:]:
-                        entry_type = 'String'
+                        entry_type = STRING
                     else:
-                        entry_type = 'Flag'
+                        entry_type = FLAG
 
-            if entry_type == 'Integer':
+            if entry_type == INTEGER:
                 vals = entry[1].split(',')
                 try:
                     val = self._map(int, vals)
@@ -405,21 +423,21 @@ class Reader(object):
                 # Handles cases with incorrectly specified header types.
                 except ValueError:
                     val = self._map(float, vals)
-            elif entry_type == 'Float':
+            elif entry_type == FLOAT:
                 vals = entry[1].split(',')
                 val = self._map(float, vals)
-            elif entry_type == 'Flag':
+            elif entry_type == FLAG:
                 val = True
-            elif entry_type in ('String', 'Character'):
+            elif entry_type == STRING:
                 try:
                     vals = entry[1].split(',') # commas are reserved characters indicating multiple values
                     val = self._map(str, vals)
                 except IndexError:
-                    entry_type = 'Flag'
+                    entry_type = FLAG
                     val = True
 
             try:
-                if self.infos[ID].num == 1 and entry_type not in ( 'Flag', ):
+                if self.infos[ID].num == 1 and entry_type != FLAG:
                     val = val[0]
             except KeyError:
                 pass
