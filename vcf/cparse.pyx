@@ -1,15 +1,16 @@
 from model import _Call
 
-cdef _map(func, iterable, bad=['.', '']):
+cdef int INTEGER = 0
+cdef int STRING = 1
+cdef int FLOAT = 2
+cdef int FLAG = 3
+
+cdef list _map(func, iterable, bad=['.', '']):
     '''``map``, but make bad values None.'''
     return [func(x) if x not in bad else None
             for x in iterable]
 
-INTEGER = 'Integer'
-FLOAT = 'Float'
-NUMERIC = 'Numeric'
-
-def _parse_filter(filt_str):
+cdef _parse_filter(str filt_str):
     '''Parse the FILTER field of a VCF entry into a Python list
 
     NOTE: this method has a python equivalent and care must be taken
@@ -26,10 +27,12 @@ def parse_samples(
         list names, list samples, samp_fmt,
         list samp_fmt_types, list samp_fmt_nums, site):
 
-    cdef char *name, *fmt, *entry_type, *sample
+    cdef char *name
+    cdef char *fmt
+    cdef char *sample
+    cdef int entry_type
     cdef int i, j
     cdef list samp_data = []
-    cdef dict sampdict
     cdef list sampvals
     n_samples = len(samples)
     n_formats = len(samp_fmt._fields)
@@ -71,7 +74,7 @@ def parse_samples(
                         sampdat[j] = int(vals)
                     except ValueError:
                         sampdat[j] = float(vals)
-                elif entry_type == FLOAT or entry_type == NUMERIC:
+                elif entry_type == FLOAT:
                     sampdat[j] = float(vals)
                 else:
                     sampdat[j] = vals
@@ -82,8 +85,8 @@ def parse_samples(
                 try:
                     sampdat[j] = _map(int, vals)
                 except ValueError:
-                    sampdat[j] = map(float, vals)
-            elif entry_type == FLOAT or entry_type == NUMERIC:
+                    sampdat[j] = _map(float, vals)
+            elif entry_type == FLOAT:
                 sampdat[j] = _map(float, vals)
             else:
                 sampdat[j] = vals

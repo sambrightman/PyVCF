@@ -45,6 +45,17 @@ RESERVED_INFO = {
     'CICN': 'Integer', 'CICNADJ': 'Integer'
 }
 
+RESERVED_FORMAT = {
+    'GT': 'String', 'DP': 'Integer', 'FT': 'String', 'GL': 'Float',
+    'GLE': 'String', 'PL': 'Integer', 'GP': 'Float', 'GQ': 'Integer',
+    'HQ': 'Integer', 'PS': 'Integer', 'PQ': 'Integer', 'EC': 'Integer',
+    'MQ': 'Integer',
+
+    # Keys used for structural variants
+    'CN': 'Integer', 'CNQ': 'Float', 'CNL': 'Float', 'NQ': 'Integer',
+    'HAP': 'Integer', 'AHAP': 'Integer'
+}
+
 INTEGER = 0
 STRING = 1
 FLOAT = 2
@@ -61,17 +72,7 @@ def _encode_type(field_type):
     }[field_type]
 
 RESERVED_INFO_CODES = { k: _encode_type(v) for k, v in RESERVED_INFO.items() }
-
-RESERVED_FORMAT = {
-    'GT': 'String', 'DP': 'Integer', 'FT': 'String', 'GL': 'Float',
-    'GLE': 'String', 'PL': 'Integer', 'GP': 'Float', 'GQ': 'Integer',
-    'HQ': 'Integer', 'PS': 'Integer', 'PQ': 'Integer', 'EC': 'Integer',
-    'MQ': 'Integer',
-
-    # Keys used for structural variants
-    'CN': 'Integer', 'CNQ': 'Float', 'CNL': 'Float', 'NQ': 'Integer',
-    'HAP': 'Integer', 'AHAP': 'Integer'
-}
+RESERVED_FORMAT_CODES = { k: _encode_type(v) for k, v in RESERVED_FORMAT.items() }
 
 # Spec is a bit weak on which metadata lines are singular, like fileformat
 # and which can have repeats, like contig
@@ -89,7 +90,7 @@ field_counts = {
 _Info = collections.namedtuple('Info', ['id', 'num', 'type', 'desc', 'source', 'version', 'type_code'])
 _Filter = collections.namedtuple('Filter', ['id', 'desc'])
 _Alt = collections.namedtuple('Alt', ['id', 'desc'])
-_Format = collections.namedtuple('Format', ['id', 'num', 'type', 'desc'])
+_Format = collections.namedtuple('Format', ['id', 'num', 'type', 'desc', 'type_code'])
 _SampleInfo = collections.namedtuple('SampleInfo', ['samples', 'gt_bases', 'gt_types', 'gt_phases'])
 _Contig = collections.namedtuple('Contig', ['id', 'length'])
 
@@ -185,7 +186,8 @@ class _vcf_metadata_parser(object):
         num = self.vcf_field_count(match.group('number'))
 
         form = _Format(match.group('id'), num,
-                       match.group('type'), match.group('desc'))
+                       match.group('type'), match.group('desc'),
+                       _encode_type(match.group('type')))
 
         return (match.group('id'), form)
 
@@ -452,14 +454,14 @@ class Reader(object):
 
         for fmt in samp_fmt._fields:
             try:
-                entry_type = self.formats[fmt].type
+                entry_type = self.formats[fmt].type_code
                 entry_num = self.formats[fmt].num
             except KeyError:
                 entry_num = None
                 try:
-                    entry_type = RESERVED_FORMAT[fmt]
+                    entry_type = RESERVED_FORMAT_CODES[fmt]
                 except KeyError:
-                    entry_type = 'String'
+                    entry_type = STRING
             samp_fmt._types.append(entry_type)
             samp_fmt._nums.append(entry_num)
         return samp_fmt
@@ -510,24 +512,24 @@ class Reader(object):
 
                 # we don't need to split single entries
                 if entry_num == 1:
-                    if entry_type == 'Integer':
+                    if entry_type == INTEGER:
                         try:
                             sampdat[i] = int(vals)
                         except ValueError:
                             sampdat[i] = float(vals)
-                    elif entry_type == 'Float' or entry_type == 'Numeric':
+                    elif entry_type == FLOAT:
                         sampdat[i] = float(vals)
                     else:
                         sampdat[i] = vals
                     continue
 
                 vals = vals.split(',')
-                if entry_type == 'Integer':
+                if entry_type == INTEGER:
                     try:
                         sampdat[i] = _map(int, vals)
                     except ValueError:
                         sampdat[i] = _map(float, vals)
-                elif entry_type == 'Float' or entry_type == 'Numeric':
+                elif entry_type == FLOAT:
                     sampdat[i] = _map(float, vals)
                 else:
                     sampdat[i] = vals
