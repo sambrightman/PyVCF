@@ -1,3 +1,3 @@
+setuptools
 cython
 pysam!=0.8.0
-setuptools
