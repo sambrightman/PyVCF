@@ -96,3 +96,61 @@ def parse_samples(
         samp_data.append(call)
 
     return samp_data
+
+def parse_info(str info_str, infos, dict reserved_info_codes):
+    '''Parse the INFO field of a VCF entry into a dictionary of Python
+    types.
+
+    '''
+    if info_str == '.':
+        return {}
+
+    cdef list entries = info_str.split(';')
+    cdef list vals
+    cdef dict retdict = {}
+    cdef int entry_type
+    cdef str entry
+    cdef str entry_key
+    cdef str entry_val
+
+    for entry in entries:
+        entry_key, _, entry_val = entry.partition('=')
+        try:
+            entry_type = infos[entry_key].type_code
+        except KeyError:
+            try:
+                entry_type = reserved_info_codes[entry_key]
+            except KeyError:
+                if entry_val:
+                    entry_type = STRING
+                else:
+                    entry_type = FLAG
+
+        if entry_type == INTEGER:
+            vals = entry_val.split(',')
+            try:
+                retdict[entry_key] = _map(int, vals)
+            # Allow specified integers to be flexibly parsed as floats.
+            # Handles cases with incorrectly specified header types.
+            except ValueError:
+                retdict[entry_key] = _map(float, vals)
+        elif entry_type == FLOAT:
+            vals = entry_val.split(',')
+            retdict[entry_key] = _map(float, vals)
+        elif entry_type == FLAG:
+            retdict[entry_key] = True
+        elif entry_type == STRING:
+            try:
+                vals = entry_val.split(',') # commas are reserved characters indicating multiple values
+                retdict[entry_key] = _map(str, vals)
+            except AttributeError:
+                entry_type = FLAG
+                retdict[entry_key] = True
+
+        try:
+            if infos[entry_key].num == 1 and entry_type != FLAG:
+                retdict[entry_key] = retdict[entry_key][0]
+        except KeyError:
+            pass
+
+    return retdict

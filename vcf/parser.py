@@ -594,7 +594,10 @@ class Reader(object):
                 qual = None
 
         filt = self._parse_filter(row[6])
-        info = self._parse_info(row[7])
+        if cparse is not None:
+            info = cparse.parse_info(row[7], self.infos, RESERVED_INFO_CODES)
+        else:
+            info = self._parse_info(row[7])
 
         try:
             fmt = row[8]
