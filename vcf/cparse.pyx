@@ -154,3 +154,53 @@ def parse_info(str info_str, infos, dict reserved_info_codes):
             pass
 
     return retdict
+
+def format_info(dict info, info_order):
+    if not info:
+        return '.'
+    def order_key(str field):
+        # Order by header definition first, alphabetically second.
+        return info_order[field], field
+    return ';'.join(_stringify_pair(f, info[f]) for f in
+                    sorted(info, key=order_key))
+
+def format_sample(str fmt, sample):
+    cdef str gt
+    cdef list result
+
+    if hasattr(sample.data, 'GT'):
+        gt = sample.data.GT
+    else:
+        gt = './.' if 'GT' in fmt else ''
+
+    result = [gt] if gt else []
+    # Following the VCF spec, GT is always the first item whenever it is present.
+    for field in sample.data._fields:
+        value = getattr(sample.data, field)
+        if field == 'GT':
+            continue
+        if field == 'FT':
+            result.append(_format_filter(value))
+        else:
+            result.append(_stringify(value))
+    return ':'.join(result)
+
+cdef str _format_filter(flt):
+    if flt == []:
+        return 'PASS'
+    return _stringify(flt, none='.', delim=';')
+
+cdef str _stringify(x, none='.', delim=','):
+    if type(x) == type([]):
+        return delim.join(_write_map(str, x, none))
+    return str(x) if x is not None else none
+
+cdef str _stringify_pair(x, y, none='.', delim=','):
+    if isinstance(y, bool):
+        return str(x) if y else ""
+    return "%s=%s" % (str(x), _stringify(y, none=none, delim=delim))
+
+cdef list _write_map(func, iterable, none='.'):
+    '''``map``, but make None values none.'''
+    return [func(x) if x is not None else none
+            for x in iterable]

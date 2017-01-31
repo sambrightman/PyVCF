@@ -755,6 +755,9 @@ class Writer(object):
         return self._stringify(flt, none='.', delim=';')
 
     def _format_info(self, info):
+        if cparse:
+            return cparse.format_info(info, self.info_order)
+
         if not info:
             return '.'
         def order_key(field):
@@ -764,6 +767,9 @@ class Writer(object):
                         sorted(info, key=order_key))
 
     def _format_sample(self, fmt, sample):
+        if cparse:
+            return cparse.format_sample(fmt, sample)
+
         if hasattr(sample.data, 'GT'):
             gt = sample.data.GT
         else:
@@ -772,7 +778,7 @@ class Writer(object):
         result = [gt] if gt else []
         # Following the VCF spec, GT is always the first item whenever it is present.
         for field in sample.data._fields:
-            value = getattr(sample.data,field)
+            value = getattr(sample.data, field)
             if field == 'GT':
                 continue
             if field == 'FT':
